@@ -21,5 +21,6 @@
 go.work
 go.work.sum
 
+venv
 # env file
 .env
