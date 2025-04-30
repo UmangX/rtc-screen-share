@@ -49,7 +49,7 @@ def generate_frames():
                        b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
 
                 # Control frame rate slightly (adjust as needed for performance)
-                time.sleep(0.03) # ~30 FPS target, reduce sleep for higher FPS
+                time.sleep(0.00) # ~30 FPS target, reduce sleep for higher FPS
 
             except Exception as e:
                 print(f"Error in frame generation: {e}")
