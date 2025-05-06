@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+ "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>Screen sharing permission required.</string>
+</dict>
+</plist>
+
+<key>NSApplicationUsageDescription</key>
+<string>This app captures the screen</string>
+<key>NSCameraUsageDescription</key>
+<string>Camera access needed for screen capture</string>
+<key>NSMicrophoneUsageDescription</key>
+<string>Microphone access needed for screen capture with audio</string>
+<key>NSSystemAdministrationUsageDescription</key>
+<string>Screen capture permission</string>
+

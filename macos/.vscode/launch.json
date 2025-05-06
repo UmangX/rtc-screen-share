@@ -1,0 +1,40 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:macos}/7xscreenshare",
+            "name": "Debug 7xscreenshare (7xscreenshare)",
+            "program": "${workspaceFolder:macos}/7xscreenshare/.build/debug/7xscreenshare",
+            "preLaunchTask": "swift: Build Debug 7xscreenshare (7xscreenshare)"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:macos}/7xscreenshare",
+            "name": "Release 7xscreenshare (7xscreenshare)",
+            "program": "${workspaceFolder:macos}/7xscreenshare/.build/release/7xscreenshare",
+            "preLaunchTask": "swift: Build Release 7xscreenshare (7xscreenshare)"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:macos}/screenshare",
+            "name": "Debug screenshare (screenshare)",
+            "program": "${workspaceFolder:macos}/screenshare/.build/debug/screenshare",
+            "preLaunchTask": "swift: Build Debug screenshare (screenshare)"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:macos}/screenshare",
+            "name": "Release screenshare (screenshare)",
+            "program": "${workspaceFolder:macos}/screenshare/.build/release/screenshare",
+            "preLaunchTask": "swift: Build Release screenshare (screenshare)"
+        }
+    ]
+}

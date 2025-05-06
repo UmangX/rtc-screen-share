@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:screenshare}",
+            "name": "Debug screenshare",
+            "program": "${workspaceFolder:screenshare}/.build/debug/screenshare",
+            "preLaunchTask": "swift: Build Debug screenshare"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:screenshare}",
+            "name": "Release screenshare",
+            "program": "${workspaceFolder:screenshare}/.build/release/screenshare",
+            "preLaunchTask": "swift: Build Release screenshare"
+        }
+    ]
+}
