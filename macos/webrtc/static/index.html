@@ -1,58 +1,105 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>7xscreenshare</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>WebRTC Receiver</title>
     <style>
-        /* Custom font for a modern look */
-        body {
-            font-family: "Inter", sans-serif;
-        }
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f0f0f0; }
+        #videoPlayer { border: 2px solid #333; background-color: black; width: 640px; height: 480px; }
+        textarea { width: 80%; max-width: 500px; height: 100px; margin-top: 10px; padding: 10px; border: 1px solid #ccc; }
+        button { padding: 10px 20px; margin-top: 10px; background-color: #007bff; color: white; border: none; cursor: pointer; border-radius: 5px; }
+        button:hover { background-color: #0056b3; }
+        h1 { color: #333; }
     </style>
 </head>
-<body class="bg-gray-900 text-gray-100 flex items-center justify-center min-h-screen">
-    <div class="text-center">
-        <h1 class="text-6xl md:text-8xl lg:text-9xl font-extrabold text-blue-400 rounded-lg p-4">
-            7xscreenshare
-        </h1>
-        <pre id="response"></pre>
-    </div>
+<body>
+    <h1>WebRTC Receiver</h1>
+    <video id="videoPlayer" autoplay playsinline controls></video>
+    <textarea id="sdpAnswer" placeholder="SDP Answer will appear here..." readonly></textarea>
+    <button onclick="startWebRTC()">Start WebRTC</button>
+
     <script>
-        async function start() {
-          const response_placeholder = document.getElementById('response');
-          const pc = new RTCPeerConnection();
-      
-          // Add dummy data channel to include media in SDP
-          pc.createDataChannel("test");
-      
-          try {
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-      
-            const res = await fetch('/sdp', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(pc.localDescription),
-            });
-      
-            if (res.ok) {
-              const answer = await res.json();
-              response_placeholder.textContent = JSON.stringify(answer, null, 2);
-              await pc.setRemoteDescription(answer);
-            } else {
-              response_placeholder.textContent = "Error: " + res.statusText;
+        let peerConnection;
+
+        async function startWebRTC() {
+            try {
+                console.log("startWebRTC function called!");
+
+                if (peerConnection) {
+                    console.log("Peer connection already exists. Closing it.");
+                    peerConnection.close();
+                    peerConnection = null;
+                }
+
+                console.log("Creating new RTCPeerConnection with empty iceServers...");
+                // Changed here: Removed iceServers from the config
+                peerConnection = new RTCPeerConnection({
+                     // iceServers: [] // You can explicitly leave it empty, or just omit the option
+                });
+                console.log("RTCPeerConnection created.");
+
+                const iceCandidatePromise = new Promise(resolve => {
+                    peerConnection.onicecandidate = event => {
+                        if (event.candidate) {
+                            console.log('New ICE candidate:', event.candidate.candidate);
+                        } else {
+                            console.log('ICE gathering complete.');
+                            resolve();
+                        }
+                    };
+                });
+                console.log("onicecandidate handler set.");
+
+                peerConnection.ontrack = event => {
+                    console.log('Track received:', event.streams[0]);
+                    const videoPlayer = document.getElementById('videoPlayer');
+                    if (videoPlayer.srcObject !== event.streams[0]) {
+                        videoPlayer.srcObject = event.streams[0];
+                    }
+                };
+                console.log("ontrack handler set.");
+
+                console.log("Creating SDP offer...");
+                const offer = await peerConnection.createOffer();
+                console.log("SDP offer created.");
+
+                console.log("Setting local description with offer...");
+                await peerConnection.setLocalDescription(offer);
+                console.log("Local description set with offer.");
+
+                console.log("Waiting for ICE gathering to complete...");
+                await iceCandidatePromise;
+                console.log("ICE gathering promise resolved.");
+
+                console.log('Sending SDP offer to server:', peerConnection.localDescription);
+                const response = await fetch('/sdp', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(peerConnection.localDescription)
+                });
+                console.log("Fetch request sent.");
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error(`HTTP error! status: ${response.status} - ${errorText}`);
+                    throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+                }
+
+                console.log("Response received from server. Parsing JSON...");
+                const sdpAnswer = await response.json();
+                console.log('Received SDP answer from server:', sdpAnswer);
+                document.getElementById('sdpAnswer').value = JSON.stringify(sdpAnswer, null, 2);
+
+                console.log("Setting remote description with server's answer...");
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(sdpAnswer));
+                console.log("Remote description from server's answer set successfully.");
+
+            } catch (error) {
+                console.error('Caught error in startWebRTC:', error);
+                alert('Error starting WebRTC. Check console for details.');
             }
-          } catch (error) {
-            console.error(error);
-            response_placeholder.textContent = "Exception: " + error;
-          }
         }
-      
-        // Call start on page load
-        window.onload = start;
-      </script>
-      
+    </script>
 </body>
 </html>
