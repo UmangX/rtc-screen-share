@@ -45,8 +45,8 @@ __how does the client and the host transmit this ?__<br>
 this is can be done using a specific end point in the http server the browser can generate the sdp itself and post it to the endpoint
 
 ---
-__how to generate and gathaer the sdp for both the client and host server__<br> 
-the browser generate the sdp and post req to the server at the /sdp endpoint here<br> 
-then the server reads the json with content : application/json header request<br> 
-this is now then used to set the configurations for host when the host is ready and configed<br> 
+__how to generate and gathaer the sdp for both the client and host server__ <br> 
+the browser generate the sdp and post req to the server at the /sdp endpoint here <br> 
+then the server reads the json with content : application/json header request <br> 
+this is now then used to set the configurations for host when the host is ready and configed <br> 
 this is used to then run the connections 
