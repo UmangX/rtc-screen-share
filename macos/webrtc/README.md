@@ -23,30 +23,30 @@ graph TD
     end
 
     subgraph Client Connects
-        D[Client (Browser) Loads client.html] --> E[Browser JS: Creates WebSocket to ws://localhost:8080/ws]
+        D[Client Browser Loads client.html] --> E[Browser JS: Creates WebSocket to ws://localhost:8080/ws]
         E --> F{WebSocket Connection Established?}
         F -- Yes --> G[Go Server: new Websocket connection in handleWebsocket]
         F -- No --> H[Error: WebSocket connection failed]
     end
 
     subgraph WebRTC Setup (Signaling)
-        G --> I[Go Server: Create new RTCPeerConnection (no iceServers)]
+        G --> I[Go Server: Create new RTCPeerConnection no iceServers]
         I --> J[Go Server: Create and Add Local VideoTrack]
-        J --> K[Go Server: Set onICECandidate handler (sends candidates to client via WS)]
+        J --> K[Go Server: Set onICECandidate handler sends candidates to client via WS]
 
-        L[Browser JS: Create new RTCPeerConnection (no iceServers)]
-        L --> M[Browser JS: Set onTrack handler (attaches stream to <video>)]
-        M --> N[Browser JS: Set onICECandidate handler (sends candidates to server via WS)]
+        L[Browser JS: Create new RTCPeerConnection no iceServers]
+        L --> M[Browser JS: Set onTrack handler attaches stream to video]
+        M --> N[Browser JS: Set onICECandidate handler sends candidates to server via WS]
 
         O[Browser JS: Create SDP Offer]
-        O --> P[Browser JS: Set Local Description (Offer)]
+        O --> P[Browser JS: Set Local Description Offer]
         P --> Q[Browser JS: Send Offer to Go Server via WebSocket]
 
         R[Go Server: Receive Offer via WebSocket]
-        R --> S[Go Server: Set Remote Description (Offer)]
+        R --> S[Go Server: Set Remote Description Offer]
         S --> T[Go Server: Create SDP Answer]
-        T --> U[Go Server: Wait for ICE Gathering Complete (optional but good practice)]
-        U --> V[Go Server: Set Local Description (Answer)]
+        T --> U[Go Server: Wait for ICE Gathering Complete]
+        U --> V[Go Server: Set Local Description Answer]
         V --> W[Go Server: Send Answer to Client via WebSocket]
     end
 
@@ -58,16 +58,16 @@ graph TD
         BB --> CC[ICE Negotiation Continues]
         CC --> DD{ICE Connection State: Connected/Completed?}
         DD -- Yes --> EE[Direct P2P Connection Established over Local Network]
-        DD -- No (Failed) --> FF[WebRTC Connection Failed]
+        DD -- No - Failed --> FF[WebRTC Connection Failed]
     end
 
     subgraph Media Streaming
         EE --> GG[Go Server: Start FFmpeg Process for Screen Capture]
-        GG --> HH[Go Server: Read Encoded Frames (e.g., VP8) from FFmpeg stdout]
-        HH --> II[Go Server: Write Encoded Frames to RTCPeerConnection's VideoTrack (using WriteSample)]
+        GG --> HH[Go Server: Read Encoded Frames from FFmpeg stdout]
+        HH --> II[Go Server: Write Encoded Frames to RTCPeerConnection's VideoTrack]
         II --> JJ[Browser: RTCPeerConnection Receives RTP Packets]
         JJ --> KK[Browser: Decodes Video]
-        KK --> LL[Browser: Displays Video in <video> element (via onTrack)]
+        KK --> LL[Browser: Displays Video in video element]
 
         MM[Continuous Loop] --> HH
         MM --> JJ
