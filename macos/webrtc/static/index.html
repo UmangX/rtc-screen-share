@@ -18,5 +18,14 @@
             7xscreenshare
         </h1>
     </div>
+    <script>
+        let peer_connections = new RTCPeerConnection(); 
+        peer_connections.createOffer()
+        .then(offer => {
+            return peer_connections.setLocalDescription(offer);
+        }).then(() => {
+            console.log("offer sdp :",peer_connections.localDescription.sdp);
+        }).catch(error => console.error(error)); 
+    </script>
 </body>
 </html>
