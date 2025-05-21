@@ -1,7 +1,15 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"net/http"
+)
+
+const (
+	webPort = ":8080"
+)
 
 func main() {
-	fmt.Println("this is working a lot")
+	fmt.Println("This is running the webrtc server ...")
+	http.ListenAndServe(webPort, http.FileServer(http.Dir("./static")))
 }
