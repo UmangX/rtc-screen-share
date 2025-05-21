@@ -17,15 +17,42 @@
         <h1 class="text-6xl md:text-8xl lg:text-9xl font-extrabold text-blue-400 rounded-lg p-4">
             7xscreenshare
         </h1>
+        <pre id="response"></pre>
     </div>
     <script>
-        let peer_connections = new RTCPeerConnection(); 
-        peer_connections.createOffer()
-        .then(offer => {
-            return peer_connections.setLocalDescription(offer);
-        }).then(() => {
-            console.log("offer sdp :",peer_connections.localDescription.sdp);
-        }).catch(error => console.error(error)); 
-    </script>
+        async function start() {
+          const response_placeholder = document.getElementById('response');
+          const pc = new RTCPeerConnection();
+      
+          // Add dummy data channel to include media in SDP
+          pc.createDataChannel("test");
+      
+          try {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+      
+            const res = await fetch('/sdp', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(pc.localDescription),
+            });
+      
+            if (res.ok) {
+              const answer = await res.json();
+              response_placeholder.textContent = JSON.stringify(answer, null, 2);
+              await pc.setRemoteDescription(answer);
+            } else {
+              response_placeholder.textContent = "Error: " + res.statusText;
+            }
+          } catch (error) {
+            console.error(error);
+            response_placeholder.textContent = "Exception: " + error;
+          }
+        }
+      
+        // Call start on page load
+        window.onload = start;
+      </script>
+      
 </body>
 </html>

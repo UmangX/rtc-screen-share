@@ -17,7 +17,9 @@ var peer_connection *webrtc.PeerConnection
 
 func main() {
 	fmt.Println("This is running the webrtc server ...")
-
+	root := "./static"
+	fs := http.FileServer(http.Dir(root))
+	http.Handle("/", fs)
 	// this is the config for webrtc
 	config := webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{},
