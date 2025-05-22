@@ -6,208 +6,159 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"time" // Import time for timeouts
 
 	"github.com/pion/webrtc/v3"
 )
 
-const (
-	webPort = ":8080"
-	udpPort = ":5004" // Define UDP port as a constant
-)
+const webPort = ":8080"
 
-var peer_connection *webrtc.PeerConnection
+var peerConnection *webrtc.PeerConnection
 
 func main() {
-	fmt.Println("This is running the webrtc server ...")
+	fmt.Println("Starting WebRTC screen-sharing server on http://localhost" + webPort)
 
-	// this is the config for web server file serving
+	// Serve static files (HTML/JS client)
 	root := "./static"
 	fs := http.FileServer(http.Dir(root))
 	http.Handle("/", fs)
 
-	// this is the config for webrtc
-	// Added a public STUN server for better ICE candidate gathering,
-	// even for local testing, as it helps in discovering host candidates.
+	// WebRTC configuration
 	config := webrtc.Configuration{
-		ICEServers: []webrtc.ICEServer{},
-	}
-	var err error
-	peer_connection, err = webrtc.NewPeerConnection(config)
-	if err != nil {
-		fmt.Printf("Error: there is some error initializing the peer connection: %v\n", err) // More detailed error
-		return                                                                               // Exit if peer connection fails to initialize
+		// Uncomment if you want to test across devices later
+		// ICEServers: []webrtc.ICEServer{
+		// 	{URLs: []string{"stun:stun.l.google.com:19302"}},
+		// },
 	}
 
-	// --- Debugging for PeerConnection States ---
-	peer_connection.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
-		fmt.Printf("ICE Connection State has changed: %s\n", connectionState.String())
+	var err error
+	peerConnection, err = webrtc.NewPeerConnection(config)
+	if err != nil {
+		fmt.Printf("❌ Error creating PeerConnection: %v\n", err)
+		return
+	}
+
+	// Log ICE connection state changes
+	peerConnection.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
+		fmt.Printf("🔄 ICE Connection State: %s\n", state.String())
 	})
 
-	peer_connection.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
-		fmt.Printf("Peer Connection State has changed: %s\n", state.String())
-		if state == webrtc.PeerConnectionStateFailed || state == webrtc.PeerConnectionStateDisconnected {
-			fmt.Println("Peer connection failed or disconnected. Investigate why!")
-			// You might want to add logic here to clean up or attempt re-connection
-		} else if state == webrtc.PeerConnectionStateConnected {
-			fmt.Println("Peer Connection is CONNECTED!")
+	// Log new ICE candidates
+	peerConnection.OnICECandidate(func(c *webrtc.ICECandidate) {
+		if c != nil {
+			fmt.Printf("📡 New ICE candidate: %s\n", c.String())
 		}
 	})
-	// --- End Debugging for PeerConnection States ---
 
-	// Setup video track
-	videotrack, err := webrtc.NewTrackLocalStaticRTP(
+	// Create video track for FFmpeg to write into
+	videoTrack, err := webrtc.NewTrackLocalStaticRTP(
 		webrtc.RTPCodecCapability{
 			MimeType:    webrtc.MimeTypeH264,
 			ClockRate:   90000,
 			SDPFmtpLine: "packetization-mode=1",
 		},
-		"video", "pion",
+		"video", "screen",
 	)
-
 	if err != nil {
-		fmt.Printf("Error: failed to create video track: %v\n", err)
-		return // Exit if track creation fails
+		fmt.Printf("❌ Error creating video track: %v\n", err)
+		return
 	}
-	transceiver, err := peer_connection.AddTransceiverFromTrack(videotrack, webrtc.RtpTransceiverInit{
+
+	transceiver, err := peerConnection.AddTransceiverFromTrack(videoTrack, webrtc.RtpTransceiverInit{
 		Direction: webrtc.RTPTransceiverDirectionSendonly,
 	})
 	if err != nil {
-		fmt.Printf("Error: failed to add transceiver from track: %v\n", err)
-		return // Exit if adding transceiver fails
+		fmt.Printf("❌ Error adding transceiver: %v\n", err)
+		return
 	}
-	fmt.Println("Added transceiver:", transceiver.Kind()) // Print transceiver kind for clarity
+	fmt.Println("✅ Transceiver added:", transceiver)
 
-	// Goroutine to read UDP and write to WebRTC track
+	// Start listening for RTP packets from FFmpeg
 	go func() {
-		conn, err := net.ListenPacket("udp", udpPort)
+		fmt.Println("📥 Waiting for RTP packets on UDP port 5004...")
+		conn, err := net.ListenPacket("udp", ":5004")
 		if err != nil {
-			fmt.Printf("Error: failed to listen on UDP port %s: %v\n", udpPort, err)
-			return // Use return instead of panic for graceful shutdown in goroutine
+			fmt.Printf("❌ Error opening UDP port: %v\n", err)
+			return
 		}
-		defer func() {
-			fmt.Printf("Closing UDP listener on %s\n", udpPort)
-			conn.Close()
-		}()
+		defer conn.Close()
 
-		fmt.Printf("Listening for H264 RTP on UDP %s...\n", udpPort)
-		buffer := make([]byte, 1500) // Standard MTU size
+		buffer := make([]byte, 1500)
 		for {
 			n, _, err := conn.ReadFrom(buffer)
 			if err != nil {
-				// Check for temporary network errors to avoid exiting on transient issues
-				if netErr, ok := err.(net.Error); ok && netErr.Temporary() {
-					fmt.Printf("Temporary read error from UDP: %v\n", err)
-					time.Sleep(100 * time.Millisecond) // Wait a bit before retrying
-					continue
-				}
-				fmt.Printf("Fatal read error from UDP: %v\n", err)
-				break // Exit loop on fatal error
+				fmt.Printf("❌ Error reading UDP packet: %v\n", err)
+				break
 			}
 
-			// fmt.Printf("Received %d bytes from %s on UDP\n", n, remoteAddr.String()) // Uncomment for verbose UDP debug
-
-			// Write to the WebRTC track
-			_, err = videotrack.Write(buffer[:n])
+			_, err = videoTrack.Write(buffer[:n])
 			if err != nil {
-				// Ignore errors if the peer connection is not yet established or closed
-				if err == io.ErrClosedPipe || err == io.EOF {
-					// fmt.Println("Write to track error: Peer connection likely closed or not ready:", err) // Uncomment for verbose closed pipe debug
-				} else {
-					fmt.Printf("Write to track error: %v\n", err) // Log other errors
-				}
+				fmt.Printf("❌ Error writing to video track: %v\n", err)
 			}
 		}
 	}()
 
-	// HTTP handler for SDP exchange
-	http.HandleFunc("/sdp", handle_sdp)
-
-	fmt.Printf("WebRTC server listening on %s and serving static files from %s\n", webPort, root)
-	err = http.ListenAndServe(webPort, nil)
-	if err != nil {
-		fmt.Printf("Error: HTTP server failed to start: %v\n", err)
+	// Handle SDP offer POSTs
+	http.HandleFunc("/sdp", handleSDP)
+	if err := http.ListenAndServe(webPort, nil); err != nil {
+		fmt.Printf("❌ HTTP server error: %v\n", err)
 	}
 }
 
-// handle_sdp handles the SDP offer/answer exchange
-func handle_sdp(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("\n--- Handling /sdp request ---") // Start of request debug
+func handleSDP(w http.ResponseWriter, r *http.Request) {
+	// CORS (if needed)
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	if r.Method != http.MethodPost {
-		fmt.Printf("Error: Method not allowed: %s\n", r.Method)
-		http.Error(w, "Method is not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, "❌ Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	body, err := io.ReadAll(r.Body)
+	defer r.Body.Close()
 	if err != nil {
-		fmt.Printf("Error: reading the request body: %v\n", err)
-		http.Error(w, "Error reading the request body", http.StatusBadRequest)
+		http.Error(w, "❌ Failed to read request body", http.StatusBadRequest)
 		return
 	}
-	defer r.Body.Close()
 
-	fmt.Printf("Received SDP data from client: %s\n", string(body))
+	fmt.Printf("📨 SDP Offer Received:\n%s\n", string(body))
 
-	if peer_connection == nil {
-		fmt.Println("Error: peer connection not initialized.")
-		http.Error(w, "Error in peer initialization", http.StatusInternalServerError)
+	if peerConnection == nil {
+		http.Error(w, "❌ PeerConnection not initialized", http.StatusInternalServerError)
 		return
 	}
 
 	var offer webrtc.SessionDescription
 	if err := json.Unmarshal(body, &offer); err != nil {
-		fmt.Printf("Error: failed to parse sdp offer: %v\n", err)
-		http.Error(w, "Error: failed to parse sdp offer", http.StatusBadRequest)
+		http.Error(w, "❌ Failed to parse SDP offer", http.StatusBadRequest)
+		fmt.Println("❌ JSON parse error:", err)
 		return
 	}
-	fmt.Printf("Successfully parsed SDP offer. Type: %s\n", offer.Type)
 
-	// Set the remote description (the offer from the client)
-	if err := peer_connection.SetRemoteDescription(offer); err != nil {
-		fmt.Printf("Error: failed to set remote description: %v\n", err)
-		http.Error(w, "Error: failed to set remote description", http.StatusInternalServerError)
+	if err := peerConnection.SetRemoteDescription(offer); err != nil {
+		http.Error(w, "❌ Failed to set remote description", http.StatusInternalServerError)
+		fmt.Println("❌ SetRemoteDescription error:", err)
 		return
 	}
-	fmt.Println("Remote description set successfully.")
+	fmt.Println("✅ Remote SDP set")
 
-	// Create an SDP answer
-	answer, err := peer_connection.CreateAnswer(nil)
+	answer, err := peerConnection.CreateAnswer(nil)
 	if err != nil {
-		fmt.Printf("Error: creating the SDP answer: %v\n", err)
-		http.Error(w, "Error: creating the answer", http.StatusInternalServerError)
+		http.Error(w, "❌ Failed to create SDP answer", http.StatusInternalServerError)
+		fmt.Println("❌ CreateAnswer error:", err)
 		return
 	}
-	fmt.Println("SDP answer created.")
 
-	// Set the local description (the answer generated by the server)
-	err = peer_connection.SetLocalDescription(answer)
-	if err != nil {
-		fmt.Printf("Error: setting the local description on the host: %v\n", err)
-		http.Error(w, "Error: setting the local description on the host", http.StatusInternalServerError)
+	if err := peerConnection.SetLocalDescription(answer); err != nil {
+		http.Error(w, "❌ Failed to set local description", http.StatusInternalServerError)
+		fmt.Println("❌ SetLocalDescription error:", err)
 		return
 	}
-	fmt.Println("Local description set successfully.")
 
-	// Wait for ICE gathering to complete. This is crucial as it ensures
-	// all local candidates are gathered before sending the answer.
-	// Add a timeout to prevent indefinite waiting if ICE gathering fails for some reason.
-	select {
-	case <-webrtc.GatheringCompletePromise(peer_connection):
-		fmt.Println("ICE gathering complete.")
-	case <-time.After(10 * time.Second): // 10 second timeout for ICE gathering
-		fmt.Println("Warning: ICE gathering timed out after 10 seconds.")
-		// It might still work, but could indicate a problem if no candidates were found.
-	}
+	<-webrtc.GatheringCompletePromise(peerConnection)
 
-	// Send the SDP answer back to the client
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(peer_connection.LocalDescription()); err != nil {
-		fmt.Printf("Error: failed to encode and send local description: %v\n", err)
-		http.Error(w, "Error: failed to encode and send local description", http.StatusInternalServerError)
-		return
+	if err := json.NewEncoder(w).Encode(peerConnection.LocalDescription()); err != nil {
+		fmt.Printf("❌ Error encoding local SDP: %v\n", err)
 	}
-	fmt.Println("SDP answer sent to client successfully.")
-	fmt.Println("--- /sdp request handling complete ---") // End of request debug
+	fmt.Println("✅ SDP Answer sent to client")
 }

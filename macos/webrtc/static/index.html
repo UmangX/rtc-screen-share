@@ -1,105 +1,171 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>WebRTC Receiver</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WebRTC Screen Receiver</title>
     <style>
-        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f0f0f0; }
-        #videoPlayer { border: 2px solid #333; background-color: black; width: 640px; height: 480px; }
-        textarea { width: 80%; max-width: 500px; height: 100px; margin-top: 10px; padding: 10px; border: 1px solid #ccc; }
-        button { padding: 10px 20px; margin-top: 10px; background-color: #007bff; color: white; border: none; cursor: pointer; border-radius: 5px; }
-        button:hover { background-color: #0056b3; }
-        h1 { color: #333; }
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        #videoPlayer {
+            border: 2px solid #333;
+            background-color: black;
+            width: 640px;
+            height: 480px;
+        }
+        textarea {
+            width: 80%;
+            max-width: 500px;
+            height: 100px;
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            font-family: monospace;
+            white-space: pre-wrap;
+            overflow-wrap: break-word;
+        }
+        button {
+            padding: 10px 20px;
+            margin-top: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        h1 {
+            color: #333;
+        }
+        #logs {
+            margin-top: 20px;
+            width: 80%;
+            max-width: 700px;
+            height: 150px;
+            background: #222;
+            color: #eee;
+            overflow-y: auto;
+            padding: 10px;
+            font-family: monospace;
+            border-radius: 6px;
+            box-shadow: inset 0 0 5px #000;
+        }
     </style>
 </head>
 <body>
-    <h1>WebRTC Receiver</h1>
+    <h1>WebRTC Screen Receiver</h1>
     <video id="videoPlayer" autoplay playsinline controls></video>
     <textarea id="sdpAnswer" placeholder="SDP Answer will appear here..." readonly></textarea>
     <button onclick="startWebRTC()">Start WebRTC</button>
 
+    <pre id="logs"></pre>
+
     <script>
         let peerConnection;
+        const logEl = document.getElementById('logs');
+        function log(...args) {
+            console.log(...args);
+            logEl.textContent += args.join(' ') + '\n';
+            logEl.scrollTop = logEl.scrollHeight;
+        }
 
         async function startWebRTC() {
-            try {
-                console.log("startWebRTC function called!");
+            log('🚀 startWebRTC() called');
 
-                if (peerConnection) {
-                    console.log("Peer connection already exists. Closing it.");
-                    peerConnection.close();
-                    peerConnection = null;
-                }
+            if (peerConnection) {
+                log('⚠️ Closing existing peer connection');
+                peerConnection.close();
+                peerConnection = null;
+            }
 
-                console.log("Creating new RTCPeerConnection with empty iceServers...");
-                // Changed here: Removed iceServers from the config
-                peerConnection = new RTCPeerConnection({
-                     // iceServers: [] // You can explicitly leave it empty, or just omit the option
-                });
-                console.log("RTCPeerConnection created.");
+            peerConnection = new RTCPeerConnection({});
+            log('🛠️ RTCPeerConnection created');
 
-                const iceCandidatePromise = new Promise(resolve => {
-                    peerConnection.onicecandidate = event => {
-                        if (event.candidate) {
-                            console.log('New ICE candidate:', event.candidate.candidate);
-                        } else {
-                            console.log('ICE gathering complete.');
-                            resolve();
-                        }
-                    };
-                });
-                console.log("onicecandidate handler set.");
+            // Add recvonly video transceiver so browser generates valid SDP with media section
+            log('🎛️ Adding recv-only video transceiver');
+            peerConnection.addTransceiver('video', { direction: 'recvonly' });
 
-                peerConnection.ontrack = event => {
-                    console.log('Track received:', event.streams[0]);
-                    const videoPlayer = document.getElementById('videoPlayer');
-                    if (videoPlayer.srcObject !== event.streams[0]) {
-                        videoPlayer.srcObject = event.streams[0];
+            const iceCandidatePromise = new Promise((resolve) => {
+                peerConnection.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        log('📡 New ICE candidate:', event.candidate.candidate);
                     }
                 };
-                console.log("ontrack handler set.");
+                peerConnection.onicegatheringstatechange = () => {
+                    log('🌐 ICE Gathering State:', peerConnection.iceGatheringState);
+                    if (peerConnection.iceGatheringState === 'complete') {
+                        log('✅ ICE gathering complete');
+                        resolve();
+                    }
+                };
+                // Safety timeout if ICE gathering stalls
+                setTimeout(() => {
+                    if (peerConnection.iceGatheringState !== 'complete') {
+                        log('⚠️ ICE gathering timeout, proceeding anyway');
+                        resolve();
+                    }
+                }, 3000);
+            });
 
-                console.log("Creating SDP offer...");
-                const offer = await peerConnection.createOffer();
-                console.log("SDP offer created.");
+            peerConnection.ontrack = (event) => {
+                log('📺 Track received', event.streams[0]);
+                const videoPlayer = document.getElementById('videoPlayer');
+                if (videoPlayer.srcObject !== event.streams[0]) {
+                    videoPlayer.srcObject = event.streams[0];
+                }
+            };
 
-                console.log("Setting local description with offer...");
-                await peerConnection.setLocalDescription(offer);
-                console.log("Local description set with offer.");
+            log('📝 Creating SDP offer...');
+            const offer = await peerConnection.createOffer();
+            log('📤 SDP offer created:\n', offer.sdp);
 
-                console.log("Waiting for ICE gathering to complete...");
-                await iceCandidatePromise;
-                console.log("ICE gathering promise resolved.");
+            log('📌 Setting local description...');
+            await peerConnection.setLocalDescription(offer);
+            log('✅ Local description set');
 
-                console.log('Sending SDP offer to server:', peerConnection.localDescription);
+            log('⏳ Waiting for ICE candidates to gather...');
+            await iceCandidatePromise;
+
+            log('📨 Sending offer to server...');
+            try {
                 const response = await fetch('/sdp', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(peerConnection.localDescription)
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(peerConnection.localDescription),
                 });
-                console.log("Fetch request sent.");
 
                 if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error(`HTTP error! status: ${response.status} - ${errorText}`);
-                    throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+                    const text = await response.text();
+                    log('❌ Server returned HTTP error:', response.status, text);
+                    alert(`Server error: ${text}`);
+                    return;
                 }
 
-                console.log("Response received from server. Parsing JSON...");
-                const sdpAnswer = await response.json();
-                console.log('Received SDP answer from server:', sdpAnswer);
-                document.getElementById('sdpAnswer').value = JSON.stringify(sdpAnswer, null, 2);
+                const answer = await response.json();
+                log('📝 Received SDP answer:', JSON.stringify(answer, null, 2));
+                document.getElementById('sdpAnswer').value = JSON.stringify(answer, null, 2);
 
-                console.log("Setting remote description with server's answer...");
-                await peerConnection.setRemoteDescription(new RTCSessionDescription(sdpAnswer));
-                console.log("Remote description from server's answer set successfully.");
+                log('📌 Setting remote description...');
+                await peerConnection.setRemoteDescription(answer);
+                log('✅ Remote description set. WebRTC connected.');
 
-            } catch (error) {
-                console.error('Caught error in startWebRTC:', error);
-                alert('Error starting WebRTC. Check console for details.');
+            } catch (err) {
+                log('🚨 WebRTC setup failed:', err);
+                alert('WebRTC setup failed. See logs for details.');
             }
         }
     </script>
 </body>
 </html>
+
