@@ -1,29 +1,102 @@
-# 7xscreenshare
+# 7xScreenShare
 
-building local network screen share with realtime streaming 
+**Stream your screen to any browser over LAN using WebRTC — no client installation required.**
 
- - has to be single command for the host os 
- - has be accessible through browser ( no client software required ) 
- 
-development choices 
+7xScreenShare is a lightweight, local-only screen sharing solution that streams your desktop to a browser via WebRTC. Designed for simplicity and speed, it eliminates the need for STUN/TURN servers, making it ideal for secure, low-latency screen sharing within a local network.
 
- - macos is a walled garden this is bad for me cause i don't want to deepdive into avfounations 
- - i tried coding using screencapture kit but the permissions is very crumblesome to configure 
- - swift is a very different language 
- - current solution for live screen recording and encoding is through ffmpeg 
- - ffmpeg is using the libav file for getting the frames for screen this is not a huge overhead for host 
- - the last method of multiple per second screenshot and then encoding it is not very fast there is a huge latency 
- 
- current status 
- 
- - python mlss libraries is used for screenshot and then encoded which is working fine 
- - used ffmpeg-dash for hls but this setup is not realtime 
- - dash hls method is good for monitoring maybe but not fast enough like screensharing 
- - i did consider rtmp protocol but the point of browser streaming is not working for rtmp we need client program to decode the stream
- -  we can do transmuxing of converting rtmp feed into dash then using hls but this is not robust 
- - looking into webrtc using go for this + ffmpeg for encoding this stream into  browser 
- 
- why ? 
+----------
 
-- this program / project is just a side project to understand how protocols works and encoding and all that  
+## 🚀 Project Goals
+
+-   **Zero Client Setup:** Enable screen viewing in any modern browser without additional software.
+    
+-   **LAN-Only Operation:** Ensure all data remains within the local network for enhanced security and privacy.
+    
+-   **Low Latency:** Utilize FFmpeg and WebRTC to achieve minimal delay in screen streaming.
+    
+-   **Cross-Platform Support:** While initially tested on macOS, aim for compatibility with Linux and Windows.
+    
+-   **Modular Design:** Facilitate easy integration and extension for various use cases.
+    
+
+----------
+
+## 🛠️ Prerequisites
+
+Before running the project, ensure the following are installed:
+
+-   [Go](https://golang.org/dl/) (version 1.16 or higher)
+    
+-   [FFmpeg](https://ffmpeg.org/download.html)
+    
+-   Make
+    
+-   [Pion WebRTC](https://github.com/pion/webrtc) Go library
+    
+
+> **Note:** This system is designed for LAN use and does not utilize STUN/TURN servers.
+
+----------
+
+## 🧪 Tested Environment
+
+-   ✅ **macOS** (tested)
+    
+-   ⚠️ **Linux** (untested)
+    
+-   ⚠️ **Windows** (untested)
+    
+
+----------
+
+## 🖥️ Usage
+
+1.  **Start Screen Capture with FFmpeg:**
+    
+    In one terminal window, run:
+    
+    `make capture` 
+    
+2.  **Run the WebRTC Server:**
+    
+    In another terminal window, run:
+    
+    `make server` 
+    
+3.  **Access the Stream:**
+    
+    Open your browser and navigate to:
+    
+    `http://localhost:8080` 
+    
+    You should see your screen being streamed in real-time.
+    
+
+----------
+
+## 📁 Project Structure
+
+-   `main.go`: The Go server that handles WebRTC signaling and serves the web interface.
+    
+-   `Makefile`: Contains commands to start the FFmpeg capture and the Go server.
+    
+-   `index.html`: The client-side interface to view the stream.
+    
+-   `README.md`: Project documentation.
+    
+
+----------
+
+## 🔧 Configuration
+
+-   **FFmpeg Capture Settings:** Modify the `make capture` command in the `Makefile` to adjust resolution, frame rate, or input source.
+    
+-   **Server Port:** The default server runs on port `8080`. To change this, modify the `main.go` file accordingly.
+    
+
+----------
+
+## 📜 License
+
+This project is licensed under the MIT License.
 
