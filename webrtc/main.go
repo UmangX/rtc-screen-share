@@ -17,17 +17,13 @@ var peerConnection *webrtc.PeerConnection
 func main() {
 	fmt.Println("Starting WebRTC screen-sharing server on http://localhost" + webPort)
 
-	// Serve static files (HTML/JS client)
 	root := "./static"
 	fs := http.FileServer(http.Dir(root))
 	http.Handle("/", fs)
 
 	// WebRTC configuration
 	config := webrtc.Configuration{
-		// Uncomment if you want to test across devices later
-		// ICEServers: []webrtc.ICEServer{
-		// 	{URLs: []string{"stun:stun.l.google.com:19302"}},
-		// },
+		// zero config because there is no stun/turn server for local area networks
 	}
 
 	var err error
@@ -39,13 +35,13 @@ func main() {
 
 	// Log ICE connection state changes
 	peerConnection.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
-		fmt.Printf("🔄 ICE Connection State: %s\n", state.String())
+		fmt.Printf(" ICE Connection State: %s\n", state.String())
 	})
 
 	// Log new ICE candidates
 	peerConnection.OnICECandidate(func(c *webrtc.ICECandidate) {
 		if c != nil {
-			fmt.Printf("📡 New ICE candidate: %s\n", c.String())
+			fmt.Printf(" New ICE candidate: %s\n", c.String())
 		}
 	})
 
@@ -59,7 +55,7 @@ func main() {
 		"video", "screen",
 	)
 	if err != nil {
-		fmt.Printf("❌ Error creating video track: %v\n", err)
+		fmt.Printf(" Error creating video track: %v\n", err)
 		return
 	}
 
@@ -67,21 +63,22 @@ func main() {
 		Direction: webrtc.RTPTransceiverDirectionSendonly,
 	})
 	if err != nil {
-		fmt.Printf("❌ Error adding transceiver: %v\n", err)
+		fmt.Printf(" Error adding transceiver: %v\n", err)
 		return
 	}
-	fmt.Println("✅ Transceiver added:", transceiver)
+	fmt.Println(" Transceiver added:", transceiver)
 
 	// Start listening for RTP packets from FFmpeg
 	go func() {
-		fmt.Println("📥 Waiting for RTP packets on UDP port 5004...")
+		fmt.Println(" Waiting for RTP packets on UDP port 5004...")
 		conn, err := net.ListenPacket("udp", ":5004")
 		if err != nil {
-			fmt.Printf("❌ Error opening UDP port: %v\n", err)
+			fmt.Printf(" Error opening UDP port: %v\n", err)
 			return
 		}
 		defer conn.Close()
 
+		// we should make the buffer bigger there was some lag on high framerate videos
 		buffer := make([]byte, 1500)
 		for {
 			n, _, err := conn.ReadFrom(buffer)
@@ -120,7 +117,7 @@ func handleSDP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Printf("📨 SDP Offer Received:\n%s\n", string(body))
+	fmt.Printf(" SDP Offer Received:\n%s\n", string(body))
 
 	if peerConnection == nil {
 		http.Error(w, "❌ PeerConnection not initialized", http.StatusInternalServerError)
@@ -139,7 +136,7 @@ func handleSDP(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("❌ SetRemoteDescription error:", err)
 		return
 	}
-	fmt.Println("✅ Remote SDP set")
+	fmt.Println(" Remote SDP set")
 
 	answer, err := peerConnection.CreateAnswer(nil)
 	if err != nil {
@@ -160,5 +157,5 @@ func handleSDP(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(peerConnection.LocalDescription()); err != nil {
 		fmt.Printf("❌ Error encoding local SDP: %v\n", err)
 	}
-	fmt.Println("✅ SDP Answer sent to client")
+	fmt.Println(" SDP Answer sent to client")
 }
