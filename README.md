@@ -1,4 +1,4 @@
-# 7xScreenShare
+# rtc screen share ( this is not webrtc because its for lan)
 
 **Stream your screen to any browser over LAN using WebRTC — no client installation required.**
 
